@@ -57,7 +57,7 @@ int omx, omy, mx, my;
 
 ImageRenderablePtr sRenderable;
 ByteImage sImage;
-}
+}  // namespace global
 
 // MARK: Free/clear/allocate simulation data
 static void freeData(void) {

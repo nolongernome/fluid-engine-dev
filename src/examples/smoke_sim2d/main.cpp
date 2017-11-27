@@ -22,6 +22,9 @@
 using namespace jet;
 using namespace viz;
 
+// MARK: Macros
+#define IX(i, j) ((i) + (sN) * (j))
+
 // MARK: Global variables
 static size_t sN = 128;
 static Frame sFrame{0, 1.0 / 60.0};
@@ -79,20 +82,28 @@ bool onKeyDown(GLFWWindow* win, const KeyEvent& keyEvent) {
 }
 
 bool onPointerPressed(GLFWWindow* win, const PointerEvent& pointerEvent) {
+    using namespace global;
     (void)win;
-    (void)pointerEvent;
+    int button =
+        (pointerEvent.pressedMouseButton() == MouseButtonType::Left) ? 0 : 1;
+    sMouseDown[button] = true;
     return true;
 }
 
 bool onPointerReleased(GLFWWindow* win, const PointerEvent& pointerEvent) {
+    using namespace global;
     (void)win;
-    (void)pointerEvent;
+    int button =
+        (pointerEvent.pressedMouseButton() == MouseButtonType::Left) ? 0 : 1;
+    sMouseDown[button] = false;
     return true;
 }
 
 bool onPointerDragged(GLFWWindow* win, const PointerEvent& pointerEvent) {
+    using namespace global;
     (void)win;
-    (void)pointerEvent;
+    sMx = (int)pointerEvent.x();
+    sMy = (int)pointerEvent.y();
     return true;
 }
 
@@ -103,6 +114,7 @@ bool onGui(GLFWWindow*) {
         ImGui::Text("Application average %.3f ms/sFrame (%.1f FPS)",
                     1000.0f / ImGui::GetIO().Framerate,
                     ImGui::GetIO().Framerate);
+<<<<<<< HEAD
 
         if (ImGui::Button("Add Source")) {
             resetEmitter();
@@ -115,6 +127,8 @@ bool onGui(GLFWWindow*) {
         auto decay = (float)sSolver->smokeDecayFactor();
         ImGui::SliderFloat("Smoke Decay", &decay, 0.0f, 0.01f);
         sSolver->setSmokeDecayFactor(decay);
+=======
+>>>>>>> [WIP] More Core API tests
     }
     ImGui::End();
     ImGui::Render();
@@ -122,7 +136,16 @@ bool onGui(GLFWWindow*) {
 }
 
 bool onUpdate(GLFWWindow* win) {
-    (void)win;
+    using namespace global;
+
+    const auto fbSize = win->framebufferSize();
+    sFrameX = (int)fbSize.x;
+    sFrameY = (int)fbSize.y;
+
+    float* uSrc = sSolver->uSource().data();
+    float* vSrc = sSolver->vSource().data();
+    float* denSrc = sSolver->densitySource().data();
+    getFromUI(denSrc, uSrc, vSrc);
 
     sSolver->update(sFrame);
     densityToImage();
@@ -133,6 +156,8 @@ bool onUpdate(GLFWWindow* win) {
 }
 
 int main(int, const char**) {
+    using namespace global;
+
     Logging::mute();
 
     GLFWApp::initialize();

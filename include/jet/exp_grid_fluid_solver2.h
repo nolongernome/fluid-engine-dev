@@ -61,6 +61,7 @@ class GridFluidSolver2 : public PhysicsAnimation {
     Array2<float> _vTemp;
     Array2<float> _den;
     Array2<float> _denTemp;
+    Array2<float> _buffer;
 };
 
 typedef std::shared_ptr<GridFluidSolver2> GridFluidSolver2Ptr;

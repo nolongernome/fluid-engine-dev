@@ -54,6 +54,7 @@
 #include <jet/core_api_array.h>
 #include <jet/core_api_buffer_view.h>
 #include <jet/core_api_device.h>
+#include <jet/core_api_grid_fluid_solver.h>
 #include <jet/cpp_utils.h>
 #include <jet/cubic_semi_lagrangian2.h>
 #include <jet/cubic_semi_lagrangian3.h>

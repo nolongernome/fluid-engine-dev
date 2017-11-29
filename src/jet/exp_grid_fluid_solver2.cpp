@@ -6,9 +6,11 @@
 
 #include <pch.h>
 
-#include <jet/exp_grid_fluid_solver2.h>
+#include <core_api_grid_fluid_solver_ispc_kernels_ispc.h>
 
 #include <jet/core_api_array.h>
+#include <jet/core_api_grid_fluid_solver.h>
+#include <jet/exp_grid_fluid_solver2.h>
 
 using namespace jet;
 using namespace experimental;
@@ -43,41 +45,59 @@ void addSource(size_t N, float* x, float* s, float dt) {
     axpy(dtView, sView, xView, &xView);
 }
 
-void setBoundaryCondition(size_t N, size_t b, float* x) {
-    size_t i;
-
-    for (i = 1; i <= N; i++) {
-        x[IX(0, i)] = b == 1 ? -x[IX(1, i)] : x[IX(1, i)];
-        x[IX(N + 1, i)] = b == 1 ? -x[IX(N, i)] : x[IX(N, i)];
-        x[IX(i, 0)] = b == 2 ? -x[IX(i, 1)] : x[IX(i, 1)];
-        x[IX(i, N + 1)] = b == 2 ? -x[IX(i, N)] : x[IX(i, N)];
-    }
-    x[IX(0, 0)] = 0.5f * (x[IX(1, 0)] + x[IX(0, 1)]);
-    x[IX(0, N + 1)] = 0.5f * (x[IX(1, N + 1)] + x[IX(0, N)]);
-    x[IX(N + 1, 0)] = 0.5f * (x[IX(N, 0)] + x[IX(N + 1, 1)]);
-    x[IX(N + 1, N + 1)] = 0.5f * (x[IX(N, N + 1)] + x[IX(N + 1, N)]);
+void setBoundaryCondition(size_t N, int b, float* x) {
+#if 0
+    BufferView xView = BufferViewBuilder()
+                           .withDevice(Device::kCpu)
+                           .withDataType(DataType::kFloat32)
+                           .withBuffer(x)
+                           .withShape({N + 2, N + 2})
+                           .build();
+    setBoundaryCondition(xView, b);
+#else
+    ::ispc::setBoundaryCondition(N, b, x);
+#endif
 }
 
-void solveLinearSystem(size_t N, size_t b, float* x, float* x0, float a,
-                       float c) {
+void solveLinearSystem(size_t N, int b, float* x, float* x0, float* buffer,
+                       float a, float c) {
+#if 0
     size_t i, j, k;
 
-    for (k = 0; k < 20; k++) {
+    for (k = 0; k < 40; k++) {
         FOR_EACH_CELL
-        x[IX(i, j)] = (x0[IX(i, j)] + a * (x[IX(i - 1, j)] + x[IX(i + 1, j)] +
-                                           x[IX(i, j - 1)] + x[IX(i, j + 1)])) /
-                      c;
+        buffer[IX(i, j)] =
+            (x0[IX(i, j)] + a * (x[IX(i - 1, j)] + x[IX(i + 1, j)] +
+                                 x[IX(i, j - 1)] + x[IX(i, j + 1)])) /
+            c;
         END_FOR
-        setBoundaryCondition(N, b, x);
+        setBoundaryCondition(N, b, buffer);
+        std::swap(buffer, x);
     }
+#elif 0
+    BufferView xView = BufferViewBuilder()
+                           .withDevice(Device::kCpu)
+                           .withDataType(DataType::kFloat32)
+                           .withBuffer(x)
+                           .withShape({N + 2, N + 2})
+                           .build();
+    BufferView x0View =
+        BufferViewBuilder().withView(xView).withBuffer(x0).build();
+    BufferView bufferView =
+        BufferViewBuilder().withView(xView).withBuffer(buffer).build();
+    solveLinearSystem(xView, x0View, bufferView, a, c, b);
+#else
+    ::ispc::solveLinearSystem(N, b, x, x0, buffer, a, c);
+#endif
 }
 
-void diffuse(size_t N, size_t b, float* x, float* x0, float diff, float dt) {
+void diffuse(size_t N, int b, float* x, float* x0, float* buffer, float diff,
+             float dt) {
     float a = dt * diff * N * N;
-    solveLinearSystem(N, b, x, x0, a, 1 + 4 * a);
+    solveLinearSystem(N, b, x, x0, buffer, a, 1 + 4 * a);
 }
 
-void advect(size_t N, size_t b, float* d, float* d0, float* u, float* v,
+void advect(size_t N, int b, float* d, float* d0, float* u, float* v,
             float dt) {
     size_t i, j, i0, j0, i1, j1;
     float x, y, s0, t0, s1, t1, dt0;
@@ -112,7 +132,8 @@ void advect(size_t N, size_t b, float* d, float* d0, float* u, float* v,
     setBoundaryCondition(N, b, d);
 }
 
-void project(size_t N, float* u, float* v, float* p, float* div) {
+void project(size_t N, float* u, float* v, float* p, float* div,
+             float* buffer) {
     size_t i, j;
 
     FOR_EACH_CELL
@@ -125,7 +146,7 @@ void project(size_t N, float* u, float* v, float* p, float* div) {
     setBoundaryCondition(N, 0, div);
     setBoundaryCondition(N, 0, p);
 
-    solveLinearSystem(N, 0, p, div, 1, 4);
+    solveLinearSystem(N, 0, p, div, buffer, 1, 4);
 
     FOR_EACH_CELL
     u[IX(i, j)] -= 0.5f * N * (p[IX(i + 1, j)] - p[IX(i - 1, j)]);
@@ -135,29 +156,29 @@ void project(size_t N, float* u, float* v, float* p, float* div) {
     setBoundaryCondition(N, 2, v);
 }
 
-void densityStep(size_t N, float* x, float* x0, float* u, float* v, float diff,
-                 float dt) {
+void densityStep(size_t N, float* x, float* x0, float* u, float* v,
+                 float* buffer, float diff, float dt) {
     addSource(N, x, x0, dt);
     std::swap(x0, x);
-    diffuse(N, 0, x, x0, diff, dt);
+    diffuse(N, 0, x, x0, buffer, diff, dt);
     std::swap(x0, x);
     advect(N, 0, x, x0, u, v, dt);
 }
 
 void velocityStep(size_t N, float* u, float* v, float* u0, float* v0,
-                  float visc, float dt) {
+                  float* buffer, float visc, float dt) {
     addSource(N, u, u0, dt);
     addSource(N, v, v0, dt);
     std::swap(u0, u);
-    diffuse(N, 1, u, u0, visc, dt);
+    diffuse(N, 1, u, u0, buffer, visc, dt);
     std::swap(v0, v);
-    diffuse(N, 2, v, v0, visc, dt);
-    project(N, u, v, u0, v0);
+    diffuse(N, 2, v, v0, buffer, visc, dt);
+    project(N, u, v, u0, v0, buffer);
     std::swap(u0, u);
     std::swap(v0, v);
     advect(N, 1, u, u0, u0, v0, dt);
     advect(N, 2, v, v0, u0, v0, dt);
-    project(N, u, v, u0, v0);
+    project(N, u, v, u0, v0, buffer);
 }
 
 }  // namespace
@@ -180,6 +201,7 @@ void GridFluidSolver2::resizeGrid(const Size2& newSize,
     _vTemp.resize(newSize, 0.0f);
     _den.resize(newSize, 0.0f);
     _denTemp.resize(newSize, 0.0f);
+    _buffer.resize(newSize, 0.0f);
 }
 
 ConstArrayAccessor2<float> GridFluidSolver2::density() const {
@@ -208,8 +230,8 @@ void GridFluidSolver2::onAdvanceTimeStep(double timeIntervalInSeconds) {
     float diff = 0.0f;
     float dt = (float)timeIntervalInSeconds;
 
-    velocityStep(N, _u.data(), _v.data(), _uTemp.data(), _vTemp.data(), visc,
-                 dt);
-    densityStep(N, _den.data(), _denTemp.data(), _u.data(), _v.data(), diff,
-                dt);
+    velocityStep(N, _u.data(), _v.data(), _uTemp.data(), _vTemp.data(),
+                 _buffer.data(), visc, dt);
+    densityStep(N, _den.data(), _denTemp.data(), _u.data(), _v.data(),
+                _buffer.data(), diff, dt);
 }

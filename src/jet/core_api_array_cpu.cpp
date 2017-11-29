@@ -10,8 +10,6 @@
 
 #include <jet/parallel.h>
 
-#include <array>
-
 namespace jet {
 
 namespace core {

@@ -8,8 +8,6 @@
 
 #include <jet/core_api_array.h>
 
-#include <array>
-
 namespace jet {
 
 namespace core {

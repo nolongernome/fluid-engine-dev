@@ -104,14 +104,12 @@ size_t getDataTypeSize(DataType dataType) {
     }
 }
 
-class Buffer;
-
 class BufferView {
  public:
     BufferView() = default;
 
-    BufferView(size_t numElem, DataType dataType, DeviceType deviceType)
-        : _numElem(numElem), _dataType(dataType), _deviceType(deviceType) {
+    BufferView(size_t numElem, DataType dataType, DeviceType deviceType) {
+        set(numElem, dataType, deviceType);
     }
 
     virtual ~BufferView() = default;
@@ -130,6 +128,12 @@ class BufferView {
 
     DeviceType deviceType() const {
         return _deviceType;
+    }
+
+    void set(size_t numElem, DataType dataType, DeviceType deviceType) {
+        _numElem = numElem;
+        _dataType = dataType;
+        _deviceType = deviceType;
     }
 
     void copyFromHost(void* data) {
@@ -158,6 +162,8 @@ class BufferView {
     DeviceType _deviceType = DeviceType::kCpu;
 };
 
+class HostBuffer;
+
 class HostBufferView : public BufferView {
  public:
     HostBufferView() {
@@ -183,6 +189,8 @@ class HostBufferView : public BufferView {
         : HostBufferView(other.data(), other.size(), getDataType<T>()) {
     }
 
+    explicit HostBufferView(const HostBuffer& buffer);
+
     void copyFromHost(void* data, size_t elemBegin, size_t elemEnd) override {
         size_t size = getDataTypeSize(dataType());
         memcpy(_buffer, static_cast<int8_t*>(data) + size * elemBegin,
@@ -195,6 +203,21 @@ class HostBufferView : public BufferView {
                size * (elemEnd - elemBegin));
     }
 
+    void set(void* data, size_t numElem, DataType dataType) {
+        _buffer = data;
+        BufferView::set(numElem, dataType, DeviceType::kCpu);
+    }
+
+    template <typename T>
+    T* data() {
+        return static_cast<T*>(_buffer);
+    }
+
+    template <typename T>
+    const T* data() const {
+        return static_cast<const T*>(_buffer);
+    }
+
  private:
     void* _buffer = nullptr;
 };
@@ -203,20 +226,83 @@ class Buffer {
  public:
     Buffer() = default;
     virtual ~Buffer() = default;
+
+    virtual DataType dataType() const = 0;
+
+    virtual size_t numberOfElements() const = 0;
+
+    virtual size_t sizeInBytes() const = 0;
+
+    virtual DeviceType deviceType() const = 0;
 };
 
 class HostBuffer : public Buffer {
  public:
-    HostBuffer();
-    HostBuffer(void* data, size_t numElem, DataType dataType);
-    HostBuffer(const HostBuffer& other);
+    HostBuffer() = default;
+
+    HostBuffer(void* data, size_t numElem, DataType dataType) {
+        size_t size = getDataTypeSize(dataType) * numElem;
+        _buffer.resize(size);
+        memcpy(_buffer.data(), data, size);
+        _view.set(_buffer.data(), numElem, dataType);
+    }
+
+    HostBuffer(const HostBuffer& other) : _buffer(other._buffer) {
+        _view.set(_buffer.data(), other.numberOfElements(), other.dataType());
+    }
+
     template <typename T, size_t N>
-    HostBuffer(const std::array<T, N>& other);
+    explicit HostBuffer(const std::array<T, N>& other)
+        : HostBuffer(other.data(), other.size(), getDataType<T>()) {
+    }
+
     template <typename T>
-    HostBuffer(const std::vector<T>& other);
+    explicit HostBuffer(const std::vector<T>& other)
+        : HostBuffer(other.data(), other.size(), getDataType<T>()) {
+    }
+
+    DataType dataType() const override {
+        return _view.dataType();
+    }
+
+    size_t numberOfElements() const override {
+        return _view.numberOfElements();
+    }
+
+    size_t sizeInBytes() const override {
+        return _view.sizeInBytes();
+    }
+
+    DeviceType deviceType() const override {
+        return _view.deviceType();
+    }
+
+    HostBufferView& view() {
+        return _view;
+    }
+
+    const HostBufferView& view() const {
+        return _view;
+    }
+
+    template <typename T>
+    T* data() {
+        return _view.data<T>();
+    }
+
+    template <typename T>
+    const T* data() const {
+        return _view.data<T>();
+    }
 
  private:
+    std::vector<int8_t> _buffer;
+    HostBufferView _view;
 };
+
+HostBufferView::HostBufferView(const HostBuffer& buffer) {
+    *this = buffer.view();
+}
 
 class ParticleSystemData final {
  public:

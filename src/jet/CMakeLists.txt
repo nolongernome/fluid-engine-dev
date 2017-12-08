@@ -16,6 +16,7 @@ set(root_dir ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
+    ${PROJECT_BINARY_DIR}/src/${target}
 )
 
 # Sources
@@ -32,6 +33,10 @@ file(GLOB sources
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/obj/*.cpp)
 
+set(ispc_sources
+    core_api_array_ispc_kernels.ispc
+    core_api_grid_fluid_solver_ispc_kernels.ispc)
+
 # Custom-build event
 set(jet_header_gen_py ${root_dir}/scripts/header_gen.py)
 add_custom_command(
@@ -43,7 +48,9 @@ add_custom_target(jet_header_gen_py ALL
     DEPENDS ${root_dir}/include/jet/jet.h)
 
 # Build library
-add_library(${target}
+add_ispc_library(${target}
+    STATIC
+    ${ispc_sources}
     ${sources})
 add_dependencies(${target} jet_header_gen_py)
 

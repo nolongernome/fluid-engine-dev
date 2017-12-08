@@ -9,6 +9,10 @@
 # CMake version
 cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR)
 
+if ((CMAKE_VERSION VERSION_EQUAL 3.3) OR (CMAKE_VERSION VERSION_GREATER 3.3))
+    cmake_policy(SET CMP0063 NEW)
+endif()
+
 # Include cmake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -23,6 +27,11 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 
 # Options
 option(USE_GL "Use OpenGL features" ON)
+option(USE_ISPC "User Intel ISPC compiler" ON)
+set(ISPC_TARGETS "host" CACHE STRING "ISPC Target" FORCE)
+set(JET_ISPC_ADDRESSING "32" CACHE STRING "" FORCE)
+
+# OpenGL
 if (USE_GL)
     find_package(OpenGL REQUIRED)
     if (APPLE)
@@ -58,6 +67,13 @@ if (USE_GL)
     set(IMGUI_LIBRARIES imgui)
 endif()
 
+# ISPC
+if (USE_ISPC)
+    set(JET_ISPC_SUPPORT ON CACHE BOOL "" FORCE)
+    add_definitions(-DJET_USE_ISPC)
+endif()
+include(cmake/ispc.cmake)
+
 # Includes
 include_directories(/usr/local/include)
 include_directories(include)
@@ -75,7 +91,7 @@ else()
 endif()
 
 # Compile options
-include(cmake/CompileOptions.cmake)
+include(cmake/compile_options.cmake)
 
 # Build type - Release by default
 if (NOT CMAKE_BUILD_TYPE)
@@ -112,9 +128,6 @@ set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
 
 # Project modules
 add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
-if ((CMAKE_VERSION VERSION_EQUAL 3.3) OR (CMAKE_VERSION VERSION_GREATER 3.3))
-    cmake_policy(SET CMP0063 NEW)
-endif()
 add_subdirectory(external/googlebenchmark)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)

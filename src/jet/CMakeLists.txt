@@ -34,8 +34,7 @@ file(GLOB sources
     ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/obj/*.cpp)
 
 set(ispc_sources
-    core_api_array_ispc_kernels.ispc
-    core_api_grid_fluid_solver_ispc_kernels.ispc)
+    "")
 
 # Custom-build event
 set(jet_header_gen_py ${root_dir}/scripts/header_gen.py)

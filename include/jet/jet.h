@@ -51,10 +51,6 @@
 #include <jet/constant_vector_field2.h>
 #include <jet/constant_vector_field3.h>
 #include <jet/constants.h>
-#include <jet/core_api_array.h>
-#include <jet/core_api_buffer_view.h>
-#include <jet/core_api_device.h>
-#include <jet/core_api_grid_fluid_solver.h>
 #include <jet/cpp_utils.h>
 #include <jet/cubic_semi_lagrangian2.h>
 #include <jet/cubic_semi_lagrangian3.h>
@@ -67,8 +63,6 @@
 #include <jet/cylinder3.h>
 #include <jet/eno_level_set_solver2.h>
 #include <jet/eno_level_set_solver3.h>
-#include <jet/exp_grid_fluid_solver2.h>
-#include <jet/exp_particle_system_data.h>
 #include <jet/face_centered_grid2.h>
 #include <jet/face_centered_grid3.h>
 #include <jet/fcc_lattice_point_generator.h>

@@ -50,7 +50,7 @@ void Grid2::forEachCellIndex(
     serialFor(
         kZeroSize, _resolution.x,
         kZeroSize, _resolution.y,
-        [this, &func](size_t i, size_t j) {
+        [&func](size_t i, size_t j) {
             func(i, j);
         });
 }
@@ -60,7 +60,7 @@ void Grid2::parallelForEachCellIndex(
     parallelFor(
         kZeroSize, _resolution.x,
         kZeroSize, _resolution.y,
-        [this, &func](size_t i, size_t j) {
+        [&func](size_t i, size_t j) {
             func(i, j);
         });
 }
